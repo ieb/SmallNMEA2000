@@ -1,6 +1,7 @@
 #ifndef SmallNMEA2000_H
 #define SmallNMEA2000_H
 
+#include <Arduino.h>
 #include <mcp_can.h>
 
 
@@ -127,7 +128,7 @@ typedef struct SNMEA2000ProductInfo {
     uint16_t productCode;
     const char * modelID;  // 32 bytes max
     const char * softwareVersion; // 32 bytes max padded
-     const char * modelVersion; // 32 bytes max padded
+    const char * modelVersion; // 32 bytes max padded
     const char * serialNumber; // 32 bytes max padded
     byte certificationLevel;
     byte loadEquivalency;
@@ -339,7 +340,7 @@ class SNMEA2000 {
 class PressureMonitor : public SNMEA2000 {
     public:
       PressureMonitor(byte addr,
-        const SNMEA2000DeviceInfo * devInfo, 
+        SNMEA2000DeviceInfo * devInfo, 
         const SNMEA2000ProductInfo * pinfo, 
         const SNMEA2000ConfigInfo * cinfo,
         const unsigned long *tx,
@@ -418,7 +419,7 @@ class PressureMonitor : public SNMEA2000 {
 class EngineMonitor : public SNMEA2000 {
     public:
       EngineMonitor(byte addr,
-        const SNMEA2000DeviceInfo * devInfo, 
+        SNMEA2000DeviceInfo * devInfo, 
         const SNMEA2000ProductInfo * pinfo, 
         const SNMEA2000ConfigInfo * cinfo,
         const unsigned long *tx,
