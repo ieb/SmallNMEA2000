@@ -1,7 +1,6 @@
 #include <Arduino.h>
-
-#include <mcp_can.h>
 #include <SPI.h>
+#include <mcp_can.h>
 #include "SmallNMEA2000.h"
 
 
