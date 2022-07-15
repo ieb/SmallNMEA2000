@@ -1,0 +1,15 @@
+{
+  "name": "SmallNMEA2000",
+  "keywords": "nmea 2000, nmea, 2000, communication, bus, boat, marine",
+  "description": "Seriously cutdown NMEA2000 library for small devices, eg Attiny85, Attiny 3224, Pro Mini etc.",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/ieb/SmallNMEA2000.git"
+  },
+  "version": "1.0.0",
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
+
