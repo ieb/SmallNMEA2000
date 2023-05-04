@@ -8,7 +8,9 @@
 
 
 bool SNMEA2000::open() {
-
+    if ( canIsOpen ) {
+        return true;
+    }
 
     if ( CAN.begin(CAN_250KBPS, MCP_8MHz)==CAN_OK ) {
         delay(200);
@@ -22,6 +24,9 @@ bool SNMEA2000::open() {
 
 
 void SNMEA2000::processMessages() {
+    if ( ! open() ) {
+        return;
+    }
     unsigned char len = 0;
     int frames = 0;
     unsigned char buf[8];
@@ -107,6 +112,10 @@ void SNMEA2000::handleISORequest(MessageHeader *messageHeader, byte * buffer, in
         return; // dont respond to queries until address is claimed.
     }
     unsigned long requestedPGN = (((unsigned long )buffer[2])<<16)|(((unsigned long )buffer[1])<<8)|(buffer[0]);
+    if ( isoRequestHandler != NULL && isoRequestHandler(requestedPGN, messageHeader, buffer, len)) {
+        // handled by the supplied handler.
+        return;
+    }
     switch(requestedPGN) {
       case 60928L: /*ISO Address Claim*/  // Someone is asking others to claim their addresses
         sendIsoAddressClaim();
@@ -466,6 +475,9 @@ void SNMEA2000::sendIsoAcknowlegement(MessageHeader *requestMessageHeader, unsig
 }
 
 void SNMEA2000::sendMessage(MessageHeader *messageHeader, byte * message, int length) {
+    if ( ! open() ) {
+        return;
+    }
     CAN.sendMsgBuf(messageHeader->id, 1, length, message);
     if ( diagnostics ) {
         messageHeader->print(" out>",message,length);

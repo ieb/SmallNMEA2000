@@ -195,6 +195,7 @@ class MessageHeader {
 
        // PDU1 format    DDSS
        void print(const char * label, byte *buf, int len) {
+             Serial.print("can: ");
              Serial.print(label);
              Serial.print(":");
              Serial.print(pgn);
@@ -247,7 +248,9 @@ class SNMEA2000 {
         bool open();
         void processMessages();
         void dumpStatus() {
-            Serial.print(F("NMEA2000 Status sent="));
+            Serial.print(F("NMEA2000 Status open="));
+            Serial.print(canIsOpen);
+            Serial.print(F(" sent="));
             Serial.print(messagesSent);
             Serial.print(F(" recieved="));
             Serial.print(messagesRecieved);
@@ -287,6 +290,10 @@ class SNMEA2000 {
         void output4ByteDouble(double v, double p);
         void output4ByteUDouble(double v, double p);
 
+        void setIsoRequestHandler(bool (*_isoRequestHandler)(unsigned long requestedPGN, MessageHeader *messageHeader, byte * buffer, int len)) {
+            isoRequestHandler = _isoRequestHandler;
+        };
+
         
         static const byte broadcastAddress=0xff;
         static const int16_t undefined2ByteDouble=0x7ffe;
@@ -318,12 +325,14 @@ class SNMEA2000 {
         const unsigned long *txPGNList;
         const unsigned long *rxPGNList;
         MCP_CAN CAN;
+        bool (*isoRequestHandler)(unsigned long requestedPGN, MessageHeader *messageHeader, byte * buffer, int len) = NULL;
         unsigned long addressClaimStarted=0;
         //output buffer and frames
         MessageHeader *packetMessageHeader;
         bool fastPacket;
         bool rxFiltersSet = false;
         bool diagnostics = false;
+        bool canIsOpen = false;
         uint8_t fastPacketSequence;
         byte buffer[8];
         uint8_t frame;
