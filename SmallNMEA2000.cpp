@@ -13,6 +13,7 @@ bool SNMEA2000::open() {
     }
 
     if ( CAN.begin(CAN_250KBPS, MCP_8MHz)==CAN_OK ) {
+        canIsOpen = true;
         delay(200);
         claimAddress();
         return true;
@@ -105,17 +106,13 @@ void SNMEA2000::handleISORequest(MessageHeader *messageHeader, byte * buffer, in
     if ( len < 3 || len > 8) {
         return; // ISO requests are expected to be between 3 and 8 bytes.
     }
-    if (messageHeader->destination == 0xff || messageHeader->destination != deviceAddress ) {
+    if (messageHeader->destination != 0xff && messageHeader->destination != deviceAddress ) {
         return;
     }
     if (!hasClaimedAddress()) {
         return; // dont respond to queries until address is claimed.
     }
     unsigned long requestedPGN = (((unsigned long )buffer[2])<<16)|(((unsigned long )buffer[1])<<8)|(buffer[0]);
-    if ( isoRequestHandler != NULL && isoRequestHandler(requestedPGN, messageHeader, buffer, len)) {
-        // handled by the supplied handler.
-        return;
-    }
     switch(requestedPGN) {
       case 60928L: /*ISO Address Claim*/  // Someone is asking others to claim their addresses
         sendIsoAddressClaim();
@@ -130,7 +127,11 @@ void SNMEA2000::handleISORequest(MessageHeader *messageHeader, byte * buffer, in
         sendConfigurationInformation(messageHeader);
         break;
       default:
-        sendIsoAcknowlegement(messageHeader, 1, 0xff);
+        if ( isoRequestHandler == NULL || !isoRequestHandler(requestedPGN, messageHeader, buffer, len) ) {
+            Serial.print(F("Not Known"));
+            Serial.println(requestedPGN);
+            sendIsoAcknowlegement(messageHeader, 1, 0xff);
+        }
     }
 
 }
