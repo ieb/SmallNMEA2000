@@ -76,8 +76,8 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
             messageHeader->print("Claim has higher precidence:", buffer, len);
             deviceAddress++;
         }
+        claimAddress();
     }
-    claimAddress();
 }
 
 void SNMEA2000::claimAddress() {
