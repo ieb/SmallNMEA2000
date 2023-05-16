@@ -19,4 +19,10 @@ eg A NMEA2000 Battery Shunt which needs about 400 bytes of RAM to operate.
 RAM:   [=         ]  12.6% (used 388 bytes from 3072 bytes)
 Flash: [=======   ]  70.5% (used 23100 bytes from 32768 bytes)
 
+# references
+
+Details of ISO Address Claim https://copperhilltech.com/blog/sae-j1939-address-management-messages-request-for-address-claimed-and-address-claimed/
+
+
+
 

@@ -194,9 +194,7 @@ class MessageHeader {
        // |-| Priority
 
        // PDU1 format    DDSS
-       void print(const char * label, byte *buf, int len) {
-             Serial.print("can: ");
-             Serial.print(label);
+       void print(byte *buf, int len) {
              Serial.print(":");
              Serial.print(pgn);
              Serial.print(",");

@@ -40,24 +40,28 @@ void SNMEA2000::processMessages() {
         switch (messageHeader.pgn) {
           case 59392L: /*ISO Acknowledgement*/
             if ( diagnostics ) {
-                messageHeader.print("<ack",buf,len);
+                Serial.print(F("can: <ack"));
+                messageHeader.print(buf,len);
             }
             break;
           case 59904L: /*ISO Request*/
             if ( diagnostics ) {
-                messageHeader.print("<req",buf,len);
+                Serial.print(F("can: <req"));
+                messageHeader.print(buf,len);
             }
             handleISORequest(&messageHeader, buf, len);
             break;
           case 60928L: /*ISO Address Claim*/
             if ( diagnostics ) {
-                messageHeader.print("<claim",buf,len);
+                Serial.print(F("can: <claim"));
+                messageHeader.print(buf,len);
             }
             handleISOAddressClaim(&messageHeader, buf, len);
             break;
           default:
             if ( diagnostics ) {
-                messageHeader.print("<unknown",buf,len);
+                Serial.print(F("can: <unknown"));
+                messageHeader.print(buf,len);
             }
         }
     }
@@ -73,7 +77,8 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
         if (devInfo->getName() > callerName ) { 
             // but our name is > callers so we must increment address and claim
             // 
-            messageHeader->print("Claim has higher precidence:", buffer, len);
+            Serial.print(F("can: Claim from remote has higher precidence:"));
+            messageHeader->print(buffer, len);
             deviceAddress++;
         }
         claimAddress();
@@ -85,17 +90,21 @@ void SNMEA2000::claimAddress() {
     rxFiltersSet = true;
     sendIsoAddressClaim();
     addressClaimStarted = millis();
+    Serial.print(F("Send Address claim for:"));
+    Serial.print(deviceAddress);
+    Serial.print(F(" at "));
+    Serial.println(addressClaimStarted);
 }
 
 bool SNMEA2000::hasClaimedAddress() {
-    if (addressClaimStarted+250 > millis() ) {
+    if ( (addressClaimStarted != 0) && 
+         (millis() > (addressClaimStarted+250))  ) {
         Serial.print(F("Address claimed as "));
-        Serial.println(deviceAddress);
-        rxFiltersSet = false;
-        addressClaimStarted = 0;
-    }
-    if ( !rxFiltersSet ) {
+        Serial.print(deviceAddress);
+        Serial.print(F(" at "));
+        Serial.println(millis());
         rxFiltersSet = setupRXFilter();
+        addressClaimStarted = 0;
     }
     return (addressClaimStarted==0);
 }
@@ -481,7 +490,8 @@ void SNMEA2000::sendMessage(MessageHeader *messageHeader, byte * message, int le
     }
     CAN.sendMsgBuf(messageHeader->id, 1, length, message);
     if ( diagnostics ) {
-        messageHeader->print(" out>",message,length);
+        Serial.print(F("can: out>"));
+        messageHeader->print(message,length);
     }
     messagesSent++;
 
