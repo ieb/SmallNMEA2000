@@ -119,7 +119,7 @@ class SNMEA2000DeviceInfo {
             deviceInformation.industryGroupAndSystemInstance = 0x80 | ((industryGroup&0x07)<<4) | (systemInstance&0x0f);
         };
         void setSerialNumber(uint32_t uniqueNumber) {
-            Serial.print("Serial Number set to ");
+            Serial.print(F("Serial Number set to "));
             Serial.println(uniqueNumber);
             deviceInformation.unicNumberAndManCode=(deviceInformation.unicNumberAndManCode&0xffe00000) | (uniqueNumber&0x1fffff);
         };
@@ -333,6 +333,22 @@ class SNMEA2000 {
         bool setupRXFilter();
         int getPgmSize(const char *str, int maxLen);
 
+        void print(tUnionDeviceInformation * devInfo) {
+            Serial.print(F("  UniqueNumber:"));
+            Serial.println(devInfo->unicNumberAndManCode&0x1fffff);
+            Serial.print(F("  ManufacturersCode:"));
+            Serial.println((devInfo->unicNumberAndManCode>>21)&0x7ff);
+            Serial.print(F("  deviceInstance:"));
+            Serial.println(devInfo->deviceInstance, DEC);
+            Serial.print(F("  deviceFunction:"));
+            Serial.println(devInfo->deviceFunction, DEC);
+            Serial.print(F("  deviceClass:"));
+            Serial.println((devInfo->deviceClass>>1)&0x7f, DEC);
+            Serial.print(F("  industryGroup:"));
+            Serial.println((devInfo->industryGroupAndSystemInstance>>4)&0x07, DEC);
+            Serial.print(F("  systemInstance:"));
+            Serial.println((devInfo->industryGroupAndSystemInstance>>4)&0x0f, DEC);
+        };
 
 
         unsigned char deviceAddress;

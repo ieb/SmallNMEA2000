@@ -27,10 +27,16 @@ The code was incorrectly emitting address claims in response to all address clai
 For some devices on the bus this would cause a reset resulting in the first message on the new address having incomplete data. Eg Em-Track B921 devices report no GPS Fix for the first message on a new address. This caused MFDs to report lost fix and in some cases lost AIS data.
 
 The fixes. 
+
 * Only emit claim responses when the addresses are claimed by 2 devices.
 * parse the address claim message completely. Its a 8 byte little endian uint_64 and can be set by pointing to the message buffer on a little endian CPU.
 * Where the names are identical, due to incorrect configuration if the device instance field, ramdomly select a new device instance field in the CAN device name to recolve the conflict. Since the Can Name device instance field is not generally used
 to indicate the physical measurement instance (eg Battery Instance), and cant be set (no support for setting it over Can Group Functions), this doesnt matter.  
+
+
+# Testing
+
+Using a CandelLite USB-CAN bus adapter with socket can on a linux box. see testscripts/
 
 # references
 
@@ -44,6 +50,6 @@ Details of ISO Address Claim https://copperhilltech.com/blog/sae-j1939-address-m
 * [x] Fix address claim race conditions
 * [x] Fix incorrect name encoding and decoding
 * [x] Deal with name clashes on address claims
-* [ ] Test triggering address claim 
+* [x] Test triggering address claim 
 
 
