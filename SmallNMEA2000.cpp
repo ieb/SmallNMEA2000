@@ -67,19 +67,53 @@ void SNMEA2000::processMessages() {
     }
 }
 
+void print_uint64_t(uint64_t num) {
+
+  char rev[128]; 
+  char *p = rev+1;
+
+  while (num > 0) {
+    *p++ = '0' + ( num % 10);
+    num/= 10;
+  }
+  p--;
+  /*Print the number which is now in reverse*/
+  while (p > rev) {
+    Serial.print(*p--);
+  }
+}
 
 
 void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffer, int len) {
     if ( messageHeader->source == 254 ) return; // annother node cannot claim an address, ignore this.
-    uint64_t callerName = (((uint64_t)buffer[2])<<16) | (((uint64_t)buffer[1])<<8) | buffer[0];
+    tUnionDeviceInformation * remoteDeviceInfo = (tUnionDeviceInformation *)(&buffer[0]);
     if ( messageHeader->source == deviceAddress ) {
         // annother device is claiming this address 
-        if (devInfo->getName() > callerName ) { 
+        Serial.print(F("can: 2 node claiming this address. local:"));
+        print_uint64_t(devInfo->getName());
+        Serial.print(F(" remote:"));
+        print_uint64_t(remoteDeviceInfo->name);
+        Serial.print(F(" msg:"));
+        messageHeader->print(buffer, len);
+        if (devInfo->getName() == remoteDeviceInfo->name ) { 
+            // should not happen. This means that we have a collision of 2 of the same devices on the same bus 
+            // with the same device instance number in the name.
+            // rather than go into an infinite loop both should randomly choose a new instance number.
+            // and try again. For some devices, the instance number is used in the messages eg BatteryInstance but for
+            // most of devices based on this library thats not the case, and its not currently possible to 
+            // set the instance number using NMEA2000 group functions.
+            Serial.println(F("can: Claim from remote is identical, duplicate device names "));
+            uint8_t newInstance = 0xfe & millis();
+            devInfo->setDeviceInstanceNumber(newInstance);
+            Serial.print(F("can: Device Instances set to  "));
+            Serial.println(newInstance, DEC);
+        } else if (devInfo->getName() > remoteDeviceInfo->name ) { 
             // but our name is > callers so we must increment address and claim
             // 
-            Serial.print(F("can: Claim from remote has higher precidence:"));
-            messageHeader->print(buffer, len);
+            Serial.println(F("can: Claim from remote has higher precidence"));
             deviceAddress++;
+        } else {
+            Serial.println(F("can: Claim from remote has lower precidence"));
         }
         claimAddress();
     }

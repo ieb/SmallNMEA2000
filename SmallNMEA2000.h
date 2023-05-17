@@ -1,6 +1,14 @@
 #ifndef SmallNMEA2000_H
 #define SmallNMEA2000_H
 
+
+
+#if defined(__GNUC__) && defined (__BYTE_ORDER__)
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#error "This code assumes little endian processors, CAN is little endian. byteswap patches will be required."
+#endif
+#endif
+
 #include <Arduino.h>
 #include <mcp_can.h>
 
@@ -57,6 +65,25 @@ byte configurationInformation[] PROGMEM = {
 // from NMEA2000 library, makes it much easier creating the name.
 
 
+// CAN and this code is Little endian so the name and order of bytes is the same.
+// This union can be send directly as a message.
+typedef union {
+  uint64_t name;
+  struct {
+    uint32_t unicNumberAndManCode; // ManufacturerCode 11 bits , UniqueNumber 21 bits
+    unsigned char deviceInstance; // indentifies multiple idendical devices on the same bus, eg 2 engine controllers.
+    unsigned char deviceFunction; // http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+    unsigned char deviceClass; // http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+  // I found document: http://www.novatel.com/assets/Documents/Bulletins/apn050.pdf it says about next fields:
+  // The System Instance Field can be utilized to facilitate multiple NMEA 2000 networks on these larger marine platforms.
+  // NMEA 2000 devices behind a bridge, router, gateway, or as part of some network segment could all indicate this by use
+  // and application of the System Instance Field.
+  // DeviceInstance and SystemInstance fields can be now changed by function SetDeviceInformationInstances or
+  // by NMEA 2000 group function. Group function handling is build in the library.
+    unsigned char industryGroupAndSystemInstance; // 4 bits each
+  };
+} tUnionDeviceInformation;
+
 
 // From https://github.com/ttlappalainen/NMEA2000/blob/ad30dced133cf7063b97aaa9ea05e434912e9100/src/NMEA2000.h#L155
 class SNMEA2000DeviceInfo {
@@ -70,7 +97,7 @@ class SNMEA2000DeviceInfo {
      * @param manufacturersCode http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
      * @param industryGroup 4 is marine
      * @param deviceInstance 
-     * @param industryGroup 
+     * @param systemInstance 
      */
      SNMEA2000DeviceInfo(
         uint32_t uniqueNumber, 
@@ -81,41 +108,33 @@ class SNMEA2000DeviceInfo {
         unsigned char deviceInstance = 0,
         unsigned char systemInstance = 0
         ) {
+
+
+
+
             deviceInformation.unicNumberAndManCode = (uniqueNumber&0x1fffff) | (((unsigned long)(manufacturersCode&0x7ff))<<21); 
             deviceInformation.deviceInstance = deviceInstance;
             deviceInformation.deviceFunction = deviceFunction;
             deviceInformation.deviceClass = (deviceClass&0x7f)<<1;
-            deviceInformation.industryGroupAndSystemInstance = (industryGroup<<4) | (systemInstance&0x0f);
+            deviceInformation.industryGroupAndSystemInstance = 0x80 | ((industryGroup&0x07)<<4) | (systemInstance&0x0f);
         };
         void setSerialNumber(uint32_t uniqueNumber) {
             Serial.print("Serial Number set to ");
             Serial.println(uniqueNumber);
             deviceInformation.unicNumberAndManCode=(deviceInformation.unicNumberAndManCode&0xffe00000) | (uniqueNumber&0x1fffff);
-        }
+        };
+
+        void setDeviceInstanceNumber(uint8_t deviceInstance) {
+            deviceInformation.deviceInstance = deviceInstance;
+        };
         uint64_t getName() {
             return deviceInformation.name;
         };
         byte * getDeviceNameBuffer() {
-            return (byte *) &(deviceInformation);
+            return (byte * ) &(deviceInformation);
         }
     
   protected:
-    typedef union {
-      uint64_t name;
-      struct {
-        uint32_t unicNumberAndManCode; // ManufacturerCode 11 bits , UniqueNumber 21 bits
-        unsigned char deviceInstance;
-        unsigned char deviceFunction;
-        unsigned char deviceClass;
-      // I found document: http://www.novatel.com/assets/Documents/Bulletins/apn050.pdf it says about next fields:
-      // The System Instance Field can be utilized to facilitate multiple NMEA 2000 networks on these larger marine platforms.
-      // NMEA 2000 devices behind a bridge, router, gateway, or as part of some network segment could all indicate this by use
-      // and application of the System Instance Field.
-      // DeviceInstance and SystemInstance fields can be now changed by function SetDeviceInformationInstances or
-      // by NMEA 2000 group function. Group function handling is build in the library.
-        unsigned char industryGroupAndSystemInstance; // 4 bits each
-      };
-    } tUnionDeviceInformation;
 
     tUnionDeviceInformation deviceInformation;
 };

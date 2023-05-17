@@ -19,10 +19,31 @@ eg A NMEA2000 Battery Shunt which needs about 400 bytes of RAM to operate.
 RAM:   [=         ]  12.6% (used 388 bytes from 3072 bytes)
 Flash: [=======   ]  70.5% (used 23100 bytes from 32768 bytes)
 
+
+# Address claim problems discovered
+
+The code was incorrectly emitting address claims in response to all address claim messages rather than just where the address was claimed by 2 devices. This caused a race condition and with more devices on the bus using this library the race condition got worse. In addition the decoding of the Can device name (uint64_t) had a bug that caused the remote name to always have a higher precidence resulting in these devices always assuming their address was claimed by another, hence these devices. Other defices would see it the other way round and hence these devices would sweep up all the addresses on the bus.
+
+For some devices on the bus this would cause a reset resulting in the first message on the new address having incomplete data. Eg Em-Track B921 devices report no GPS Fix for the first message on a new address. This caused MFDs to report lost fix and in some cases lost AIS data.
+
+The fixes. 
+* Only emit claim responses when the addresses are claimed by 2 devices.
+* parse the address claim message completely. Its a 8 byte little endian uint_64 and can be set by pointing to the message buffer on a little endian CPU.
+* Where the names are identical, due to incorrect configuration if the device instance field, ramdomly select a new device instance field in the CAN device name to recolve the conflict. Since the Can Name device instance field is not generally used
+to indicate the physical measurement instance (eg Battery Instance), and cant be set (no support for setting it over Can Group Functions), this doesnt matter.  
+
 # references
 
 Details of ISO Address Claim https://copperhilltech.com/blog/sae-j1939-address-management-messages-request-for-address-claimed-and-address-claimed/
 
 
+
+
+# ToDO
+
+* [x] Fix address claim race conditions
+* [x] Fix incorrect name encoding and decoding
+* [x] Deal with name clashes on address claims
+* [ ] Test triggering address claim 
 
 
