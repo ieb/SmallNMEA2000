@@ -11,12 +11,15 @@ bool SNMEA2000::open() {
     if ( canIsOpen ) {
         return true;
     }
-
-    if ( CAN.begin(CAN_250KBPS, MCP_8MHz)==CAN_OK ) {
+    uint8_t res =  CAN.begin(CAN_250KBPS, MCP_8MHz);
+    if (res == CAN_OK ) {
         canIsOpen = true;
         delay(200);
         claimAddress();
         return true;
+    } else {
+        console->print(F("CAN Fail code:"));
+        console->println(res);
     }
     return false;
 }
@@ -25,7 +28,7 @@ bool SNMEA2000::open() {
 
 
 void SNMEA2000::processMessages() {
-    if ( ! open() ) {
+    if ( ! canIsOpen ) {
         return;
     }
     unsigned char len = 0;
@@ -40,34 +43,34 @@ void SNMEA2000::processMessages() {
         switch (messageHeader.pgn) {
           case 59392L: /*ISO Acknowledgement*/
             if ( diagnostics ) {
-                Serial.print(F("can: <ack"));
-                messageHeader.print(buf,len);
+                console->print(F("can: <ack"));
+                messageHeader.print(console, buf,len);
             }
             break;
           case 59904L: /*ISO Request*/
             if ( diagnostics ) {
-                Serial.print(F("can: <req"));
-                messageHeader.print(buf,len);
+                console->print(F("can: <req"));
+                messageHeader.print(console, buf,len);
             }
             handleISORequest(&messageHeader, buf, len);
             break;
           case 60928L: /*ISO Address Claim*/
             if ( diagnostics ) {
-                Serial.print(F("can: <claim"));
-                messageHeader.print(buf,len);
+                console->print(F("can: <claim"));
+                messageHeader.print(console, buf,len);
             }
             handleISOAddressClaim(&messageHeader, buf, len);
             break;
           default:
             if ( diagnostics ) {
-                Serial.print(F("can: <unknown"));
-                messageHeader.print(buf,len);
+                console->print(F("can: <unknown"));
+                messageHeader.print(console, buf,len);
             }
         }
     }
 }
 
-void print_uint64_t(uint64_t num) {
+void SNMEA2000::print_uint64_t(uint64_t num) {
 
   char rev[128]; 
   char *p = rev+1;
@@ -79,7 +82,7 @@ void print_uint64_t(uint64_t num) {
   p--;
   /*Print the number which is now in reverse*/
   while (p > rev) {
-    Serial.print(*p--);
+    console->print(*p--);
   }
 }
 
@@ -89,12 +92,12 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
     tUnionDeviceInformation * remoteDeviceInfo = (tUnionDeviceInformation *)(&buffer[0]);
     if ( messageHeader->source == deviceAddress ) {
         // annother device is claiming this address 
-        Serial.print(F("can: 2 node claiming this address. local:"));
+        console->print(F("can: 2 node claiming this address. local:"));
         print_uint64_t(devInfo->getName());
-        Serial.print(F(" remote:"));
+        console->print(F(" remote:"));
         print_uint64_t(remoteDeviceInfo->name);
-        Serial.print(F(" msg:"));
-        messageHeader->print(buffer, len);
+        console->print(F(" msg:"));
+        messageHeader->print(console, buffer, len);
         if (devInfo->getName() == remoteDeviceInfo->name ) { 
             // should not happen. This means that we have a collision of 2 of the same devices on the same bus 
             // with the same device instance number in the name.
@@ -102,18 +105,18 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
             // and try again. For some devices, the instance number is used in the messages eg BatteryInstance but for
             // most of devices based on this library thats not the case, and its not currently possible to 
             // set the instance number using NMEA2000 group functions.
-            Serial.println(F("can: Claim from remote is identical, duplicate device names "));
+            console->println(F("can: Claim from remote is identical, duplicate device names "));
             uint8_t newInstance = 0xfe & millis();
             devInfo->setDeviceInstanceNumber(newInstance);
-            Serial.print(F("can: Device Instances set to  "));
-            Serial.println(newInstance, DEC);
+            console->print(F("can: Device Instances set to  "));
+            console->println(newInstance, DEC);
         } else if (devInfo->getName() > remoteDeviceInfo->name ) { 
             // but our name is > callers so we must increment address and claim
             // 
-            Serial.println(F("can: Claim from remote has higher precidence"));
+            console->println(F("can: Claim from remote has higher precidence"));
             deviceAddress++;
         } else {
-            Serial.println(F("can: Claim from remote has lower precidence"));
+            console->println(F("can: Claim from remote has lower precidence"));
         }
         claimAddress();
     }
@@ -124,19 +127,19 @@ void SNMEA2000::claimAddress() {
     rxFiltersSet = true;
     sendIsoAddressClaim();
     addressClaimStarted = millis();
-    Serial.print(F("Send Address claim for:"));
-    Serial.print(deviceAddress);
-    Serial.print(F(" at "));
-    Serial.println(addressClaimStarted);
+    console->print(F("Send Address claim for:"));
+    console->print(deviceAddress);
+    console->print(F(" at "));
+    console->println(addressClaimStarted);
 }
 
 bool SNMEA2000::hasClaimedAddress() {
     if ( (addressClaimStarted != 0) && 
          (millis() > (addressClaimStarted+250))  ) {
-        Serial.print(F("Address claimed as "));
-        Serial.print(deviceAddress);
-        Serial.print(F(" at "));
-        Serial.println(millis());
+        console->print(F("Address claimed as "));
+        console->print(deviceAddress);
+        console->print(F(" at "));
+        console->println(millis());
         rxFiltersSet = setupRXFilter();
         addressClaimStarted = 0;
     }
@@ -171,8 +174,8 @@ void SNMEA2000::handleISORequest(MessageHeader *messageHeader, byte * buffer, in
         break;
       default:
         if ( isoRequestHandler == NULL || !isoRequestHandler(requestedPGN, messageHeader, buffer, len) ) {
-            Serial.print(F("Not Known"));
-            Serial.println(requestedPGN);
+            console->print(F("Not Known"));
+            console->println(requestedPGN);
             sendIsoAcknowlegement(messageHeader, 1, 0xff);
         }
     }
@@ -348,6 +351,8 @@ void SNMEA2000::output4ByteDouble(double value, double precision) {
 
 
 
+
+
 void SNMEA2000::output4ByteUDouble(double value, double precision) {
     if (value == SNMEA2000::n2kDoubleNA ) {
         // undef is 4294967295U = FFFFFFFF
@@ -447,7 +452,7 @@ void SNMEA2000::finishPacket() {
         }
     } else {
         packetErrors++;
-        Serial.println(F("Error: Not a Single Packet"));
+        console->println(F("Error: Not a Single Packet"));
     }
 }
 
@@ -463,7 +468,27 @@ void SNMEA2000::startFastPacket(MessageHeader *messageHeader, int length) {
     ob = 0;
     buffer[ob++] =  (fastPacketSequence << 5) | frame++;
     buffer[ob++] = length;
+    fastPacketLength = length;
+    fastPacketSent = 0;
 } 
+
+void SNMEA2000::checkFastPacket() {
+    if ( fastPacket ) {
+        if ( fastPacketLength > 223 ) {
+            console->print(F("Error: fastpacket too long:"));
+            console->println(fastPacketLength);
+        }
+        if ( fastPacketSent != fastPacketLength ) {
+            console->print(F("Error: FastPacket length wrong wanted:"));
+            console->print(fastPacketLength);
+            console->print(F(" got:"));
+            console->println(fastPacketSent);
+        } 
+    } else {
+        console->println(F("not fast packet"));
+    }
+}
+
 
 void SNMEA2000::finishFastPacket() {
     if (fastPacket ) {
@@ -473,13 +498,14 @@ void SNMEA2000::finishFastPacket() {
         }
     } else {
         packetErrors++;
-        Serial.println(F("Error: Not a FastPacket"));
+        console->println(F("Error: Not a FastPacket"));
     }
 }
 
 void SNMEA2000::outputByte(byte opb) {
     if ( ob < 8 ) {
         buffer[ob++] = opb;
+        fastPacketLength--;
         if( fastPacket && ob == 8) {
             sendMessage(packetMessageHeader, &buffer[0], 8);
             ob = 0;
@@ -487,7 +513,7 @@ void SNMEA2000::outputByte(byte opb) {
         }
     } else {
         frameErrors++;
-        Serial.println(F("Error: Frame > 8 bytes"));
+        console->println(F("Error: Frame > 8 bytes"));
     }
 }
 
@@ -519,13 +545,17 @@ void SNMEA2000::sendIsoAcknowlegement(MessageHeader *requestMessageHeader, unsig
 }
 
 void SNMEA2000::sendMessage(MessageHeader *messageHeader, byte * message, int length) {
-    if ( ! open() ) {
+    if ( ! canIsOpen ) {
         return;
     }
-    CAN.sendMsgBuf(messageHeader->id, 1, length, message);
+    uint8_t res = CAN.sendMsgBuf(messageHeader->id, 1, length, message);
+    if ( res != CAN_OK ) {
+        console->print(F("can: err"));
+        console->println(res);
+    }
     if ( diagnostics ) {
-        Serial.print(F("can: out>"));
-        messageHeader->print(message,length);
+        console->print(F("can: out>"));
+        messageHeader->print(console, message,length);
     }
     messagesSent++;
 

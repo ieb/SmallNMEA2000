@@ -33,7 +33,7 @@ byte productInformationBuffer[] PROGMEM = {
     MODEL_ID_BYTEFF, 0xff,
     SWCODE_BYTEFF, 0xff,
     MODEL_VERSION_BYTEFF, 0xff,
-    SERIAL_CODE_BYTEFF, 0xff,
+    console->CODE_BYTEFF, 0xff,
     CERTIFICATION_LEVEL_BYTE,
     LOAD_EQUIV_BYTE
 };
@@ -119,8 +119,6 @@ class SNMEA2000DeviceInfo {
             deviceInformation.industryGroupAndSystemInstance = 0x80 | ((industryGroup&0x07)<<4) | (systemInstance&0x0f);
         };
         void setSerialNumber(uint32_t uniqueNumber) {
-            Serial.print(F("Serial Number set to "));
-            Serial.println(uniqueNumber);
             deviceInformation.unicNumberAndManCode=(deviceInformation.unicNumberAndManCode&0xffe00000) | (uniqueNumber&0x1fffff);
         };
 
@@ -213,24 +211,24 @@ class MessageHeader {
        // |-| Priority
 
        // PDU1 format    DDSS
-       void print(byte *buf, int len) {
-             Serial.print(":");
-             Serial.print(pgn);
-             Serial.print(",");
-             Serial.print(source);
-             Serial.print(",");
-             Serial.print(destination);
-             Serial.print(",");
-             Serial.print(priority);
-             Serial.print(",");
-             Serial.print(len);
-             Serial.print(",");
-             Serial.print(id,HEX);
+       void print(Print *console, byte *buf, int len) {
+             console->print(":");
+             console->print(pgn);
+             console->print(",");
+             console->print(source);
+             console->print(",");
+             console->print(destination);
+             console->print(",");
+             console->print(priority);
+             console->print(",");
+             console->print(len);
+             console->print(",");
+             console->print(id,HEX);
              for (int i = 0; i < len; i++) {
-                 Serial.print(",");
-                 Serial.print(buf[i],HEX);
+                 console->print(",");
+                 console->print(buf[i],HEX);
              }
-             Serial.println(";");
+             console->println(";");
        }
 
        unsigned long id;
@@ -250,7 +248,8 @@ class SNMEA2000 {
         const SNMEA2000ConfigInfo * cinfo,
         const unsigned long *tx,
         const unsigned long *rx,
-        const uint8_t csPin
+        const uint8_t csPin,
+        Print * console = &Serial
         ): 
         deviceAddress{addr},
         devInfo{devInfo},
@@ -258,42 +257,44 @@ class SNMEA2000 {
         configInfo{cinfo},
         txPGNList{tx},
         rxPGNList{rx} ,
-        CAN{csPin}
+        CAN{csPin},
+        console{console}
         {
         };
 
         bool open();
         void processMessages();
         void dumpStatus() {
-            Serial.print(F("NMEA2000 Status open="));
-            Serial.print(canIsOpen);
-            Serial.print(F(" sent="));
-            Serial.print(messagesSent);
-            Serial.print(F(" recieved="));
-            Serial.print(messagesRecieved);
-            Serial.print(F(" packet errors="));
-            Serial.print(packetErrors);
-            Serial.print(F(" frame errors="));
-            Serial.println(frameErrors);
+            console->print(F("NMEA2000 Status open="));
+            console->print(canIsOpen);
+            console->print(F(" sent="));
+            console->print(messagesSent);
+            console->print(F(" recieved="));
+            console->print(messagesRecieved);
+            console->print(F(" packet errors="));
+            console->print(packetErrors);
+            console->print(F(" frame errors="));
+            console->println(frameErrors);
         };
         void setDiagnostics(bool enabled) {
             diagnostics = enabled;
         };
         void sendMessage(MessageHeader *messageHeader, byte *message, int len);
         //void sendFastPacket(MessageHeader *messageHeader, byte *message, int len, bool progmem=false);    
-        void setSerialNumber(uint32_t _serialNumber) { 
-            devInfo->setSerialNumber(_serialNumber); 
+        void setSerialNumber(uint32_t serialNumber) { 
+            devInfo->setSerialNumber(serialNumber); 
         };
         void setDeviceAddress(unsigned char _deviceAddress) { 
             deviceAddress = _deviceAddress; 
-            Serial.print("Device Address set to ");
-            Serial.println(deviceAddress);
+            console->print("Device Address set to ");
+            console->println(deviceAddress);
         };
         unsigned char getAddress() { return deviceAddress; };
         void startPacket(MessageHeader *messageHeader);
         void finishPacket();
         void startFastPacket(MessageHeader *messageHeader, int length);
         void finishFastPacket();
+        void checkFastPacket();
         void outputByte(byte opb);
         void output3ByteInt(int32_t i);
         void output2ByteUInt(uint16_t i);
@@ -318,6 +319,9 @@ class SNMEA2000 {
         static constexpr double n2kDoubleNA=-1000000000.0;
         static const uint8_t n2kInt8NA=127;
 
+    protected:
+        Print * console;
+
     private:
         void handleISOAddressClaim(MessageHeader *messageHeader, byte * buffer, int len);
         void claimAddress();
@@ -332,22 +336,23 @@ class SNMEA2000 {
         bool clearRXFilter();
         bool setupRXFilter();
         int getPgmSize(const char *str, int maxLen);
+        void print_uint64_t(uint64_t num);
 
         void print(tUnionDeviceInformation * devInfo) {
-            Serial.print(F("  UniqueNumber:"));
-            Serial.println(devInfo->unicNumberAndManCode&0x1fffff);
-            Serial.print(F("  ManufacturersCode:"));
-            Serial.println((devInfo->unicNumberAndManCode>>21)&0x7ff);
-            Serial.print(F("  deviceInstance:"));
-            Serial.println(devInfo->deviceInstance, DEC);
-            Serial.print(F("  deviceFunction:"));
-            Serial.println(devInfo->deviceFunction, DEC);
-            Serial.print(F("  deviceClass:"));
-            Serial.println((devInfo->deviceClass>>1)&0x7f, DEC);
-            Serial.print(F("  industryGroup:"));
-            Serial.println((devInfo->industryGroupAndSystemInstance>>4)&0x07, DEC);
-            Serial.print(F("  systemInstance:"));
-            Serial.println((devInfo->industryGroupAndSystemInstance>>4)&0x0f, DEC);
+            console->print(F("  UniqueNumber:"));
+            console->println(devInfo->unicNumberAndManCode&0x1fffff);
+            console->print(F("  ManufacturersCode:"));
+            console->println((devInfo->unicNumberAndManCode>>21)&0x7ff);
+            console->print(F("  deviceInstance:"));
+            console->println(devInfo->deviceInstance, DEC);
+            console->print(F("  deviceFunction:"));
+            console->println(devInfo->deviceFunction, DEC);
+            console->print(F("  deviceClass:"));
+            console->println((devInfo->deviceClass>>1)&0x7f, DEC);
+            console->print(F("  industryGroup:"));
+            console->println((devInfo->industryGroupAndSystemInstance>>4)&0x07, DEC);
+            console->print(F("  systemInstance:"));
+            console->println((devInfo->industryGroupAndSystemInstance>>4)&0x0f, DEC);
         };
 
 
@@ -367,6 +372,8 @@ class SNMEA2000 {
         bool diagnostics = false;
         bool canIsOpen = false;
         uint8_t fastPacketSequence;
+        int16_t fastPacketSent;
+        int16_t fastPacketLength;
         byte buffer[8];
         uint8_t frame;
         uint8_t ob;
