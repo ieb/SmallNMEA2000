@@ -135,7 +135,7 @@ void SNMEA2000::claimAddress() {
 
 bool SNMEA2000::hasClaimedAddress() {
     if ( (addressClaimStarted != 0) && 
-         (millis() > (addressClaimStarted+250))  ) {
+         (millis()-addressClaimStarted > 250)  ) {
         console->print(F("Address claimed as "));
         console->print(deviceAddress);
         console->print(F(" at "));

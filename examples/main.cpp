@@ -66,7 +66,7 @@ EngineMonitor engineMonitor = EngineMonitor(DEVICE_ADDRESS,
 void sendRapidEngineData() {
   static unsigned long lastRapidEngineUpdate=0;
   unsigned long now = millis();
-  if ( now > lastRapidEngineUpdate+RAPID_ENGINE_UPDATE_PERIOD ) {
+  if ( now-lastRapidEngineUpdate > RAPID_ENGINE_UPDATE_PERIOD ) {
     lastRapidEngineUpdate = now;
     engineMonitor.sendRapidEngineDataMessage(ENGINE_INSTANCE, 100);
   }
@@ -76,7 +76,7 @@ void sendRapidEngineData() {
 void sendEngineData() {
   static unsigned long lastEngineUpdate=0;
   unsigned long now = millis();
-  if ( now > lastEngineUpdate+ENGINE_UPDATE_PERIOD ) {
+  if ( now-lastEngineUpdate > ENGINE_UPDATE_PERIOD ) {
     lastEngineUpdate = now;
     engineMonitor.sendEngineDynamicParamMessage(ENGINE_INSTANCE,
         1234,
@@ -89,7 +89,7 @@ void sendVoltages() {
   static unsigned long lastVoltageUpdate=0;
   static byte sid = 0;
   unsigned long now = millis();
-  if ( now > lastVoltageUpdate+VOLTAGE_UPDATE_PERIOD ) {
+  if ( now-lastVoltageUpdate > VOLTAGE_UPDATE_PERIOD ) {
     lastVoltageUpdate = now;
     // because the engine monitor is not on all the time, the sid and instance ids of these messages has been shifted
     // to make space for sensors that are on all the time, and would be used by default
@@ -102,7 +102,7 @@ void sendVoltages() {
 void sendFuel() {
   static unsigned long lastFuelUpdate=0;
   unsigned long now = millis();
-  if ( now > lastFuelUpdate+FUEL_UPDATE_PERIOD ) {
+  if ( now-lastFuelUpdate > FUEL_UPDATE_PERIOD ) {
     lastFuelUpdate = now;
     engineMonitor.sendFluidLevelMessage(FUEL_TYPE, FUEL_LEVEL_INSTANCE, 80, 60);
 
@@ -113,7 +113,7 @@ void sendTemperatures() {
   static unsigned long lastTempUpdate=0;
   static byte sid = 0;
   unsigned long now = millis();
-  if ( now > lastTempUpdate+TEMPERATURE_UPDATE_PERIOD ) {
+  if ( now-lastTempUpdate > TEMPERATURE_UPDATE_PERIOD ) {
     lastTempUpdate = now;
     engineMonitor.sendTemperatureMessage(sid, 0, 14,440);
     engineMonitor.sendTemperatureMessage(sid, 1, 3, 350);
