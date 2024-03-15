@@ -51,5 +51,6 @@ Details of ISO Address Claim https://copperhilltech.com/blog/sae-j1939-address-m
 * [x] Fix incorrect name encoding and decoding
 * [x] Deal with name clashes on address claims
 * [x] Test triggering address claim 
+* [ ] Fix some errors in unsigned and signed messages, and update dependent firmware.
 
 

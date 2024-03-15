@@ -624,7 +624,7 @@ void EngineMonitor::sendDCBatterStatusMessage(
     MessageHeader messageHeader(127508L, 6, getAddress(), SNMEA2000::broadcastAddress);
     startPacket(&messageHeader);
     outputByte(batteryInstance);  
-    output2ByteDouble(batteryVoltage,0.01);
+    output2ByteUDouble(batteryVoltage,0.01);
     output2ByteDouble(batteryCurrent,0.1);
     output2ByteUDouble(batteryTemperature,0.01);
     outputByte(sid);
@@ -692,7 +692,7 @@ void PressureMonitor::sendEnvironmentParameters(
     outputByte(sid);
     outputByte(((humiditySource) & 0x03)<<6 | (tempSource & 0x3f));
     output2ByteUDouble(temperature,0.01);
-    output2ByteUDouble(humidity,0.004);
+    output2ByteDouble(humidity,0.004);
     output2ByteUDouble(atmosphericPressure,100);
     finishPacket();
 }
@@ -727,8 +727,8 @@ void PressureMonitor::sendTemperature(byte sid, byte temperatureSource,  byte te
     outputByte(sid);
     outputByte(temperatureInstance);
     outputByte(temperatureSource);
-    output3ByteDouble(tremperature,0.001);
-    output2ByteDouble(SNMEA2000::n2kDoubleNA,0.1);
+    output3ByteUDouble(tremperature,0.001);
+    output2ByteUDouble(SNMEA2000::n2kDoubleNA,0.1);
     finishPacket();
 }
 
