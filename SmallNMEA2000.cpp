@@ -7,11 +7,11 @@
 
 
 
-bool SNMEA2000::open() {
+bool SNMEA2000::open(byte clockSet) {
     if ( canIsOpen ) {
         return true;
     }
-    uint8_t res =  CAN.begin(CAN_250KBPS, MCP_8MHz);
+    uint8_t res =  CAN.begin(CAN_250KBPS, clockSet);
     if (res == CAN_OK ) {
         canIsOpen = true;
         delay(200);
@@ -329,6 +329,21 @@ void SNMEA2000::output3ByteDouble(double value, double precision) {
         outputByte((i>>16)&0xff);
     }
 }
+void SNMEA2000::output3ByteUDouble(double value, double precision) {
+    if (value == SNMEA2000::n2kDoubleNA ) {
+        // undef is 2147483647 = FFFFFF
+        outputByte(0xff);
+        outputByte(0xff);
+        outputByte(0xff);
+    } else {
+        double vd=value/precision;
+        vd = round(vd);
+        int32_t i = (vd>=0 && vd<16777214L)?(int32_t)vd:16777214L;
+        outputByte(i&0xff);
+        outputByte((i>>8)&0xff);
+        outputByte((i>>16)&0xff);
+    }
+}
 
 void SNMEA2000::output4ByteDouble(double value, double precision) {
     if (value == SNMEA2000::n2kDoubleNA ) {
@@ -340,7 +355,7 @@ void SNMEA2000::output4ByteDouble(double value, double precision) {
     } else {
         double vd=value/precision;
         vd = round(vd);
-        int32_t i = (vd>=-2147483648L && vd<0x7ffffffe)?(int32_t)vd:0x7ffffffe;
+        int32_t i = (vd>=-2147483648L && vd<2147483647L)?(int32_t)vd:2147483647L;
         outputByte(i&0xff);
         outputByte((i>>8)&0xff);
         outputByte((i>>16)&0xff);

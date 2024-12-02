@@ -262,7 +262,7 @@ class SNMEA2000 {
         {
         };
 
-        bool open();
+        bool open(byte clockSet = MCP_8MHz);
         void processMessages();
         void dumpStatus() {
             console->print(F("NMEA2000 Status open="));
@@ -305,6 +305,7 @@ class SNMEA2000 {
         void output2ByteDouble(double v, double p);
         void output2ByteUDouble(double v, double p);
         void output3ByteDouble(double v, double p);
+        void output3ByteUDouble(double v, double p);
         void output4ByteDouble(double v, double p);
         void output4ByteUDouble(double v, double p);
 
@@ -319,8 +320,6 @@ class SNMEA2000 {
         static constexpr double n2kDoubleNA=-1000000000.0;
         static const uint8_t n2kInt8NA=127;
 
-    protected:
-        Print * console;
 
     private:
         void handleISOAddressClaim(MessageHeader *messageHeader, byte * buffer, int len);
@@ -381,6 +380,9 @@ class SNMEA2000 {
         uint16_t messagesSent = 0;
         uint16_t packetErrors = 0;
         uint16_t frameErrors = 0;
+
+    protected:
+        Print * console;
 
 
 
