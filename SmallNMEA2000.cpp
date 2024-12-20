@@ -639,7 +639,7 @@ void EngineMonitor::sendDCBatterStatusMessage(
     MessageHeader messageHeader(127508L, 6, getAddress(), SNMEA2000::broadcastAddress);
     startPacket(&messageHeader);
     outputByte(batteryInstance);  
-    output2ByteUDouble(batteryVoltage,0.01);
+    output2ByteDouble(batteryVoltage,0.01);
     output2ByteDouble(batteryCurrent,0.1);
     output2ByteUDouble(batteryTemperature,0.01);
     outputByte(sid);
