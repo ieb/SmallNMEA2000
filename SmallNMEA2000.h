@@ -296,6 +296,7 @@ class SNMEA2000 {
         void finishFastPacket();
         void checkFastPacket();
         void outputByte(byte opb);
+        void output3ByteUInt(uint32_t i);
         void output3ByteInt(int32_t i);
         void output2ByteUInt(uint16_t i);
         void outputFixedString(const char * str, int maxLen, byte padding);
@@ -312,7 +313,9 @@ class SNMEA2000 {
         void setIsoRequestHandler(bool (*_isoRequestHandler)(unsigned long requestedPGN, MessageHeader *messageHeader, byte * buffer, int len)) {
             isoRequestHandler = _isoRequestHandler;
         };
-
+        void setMessageHandler(void (*_messageHandler)(MessageHeader *messageHeader, byte * buffer, int len)) {
+            messageHandler = _messageHandler;
+        };
         
         static const byte broadcastAddress=0xff;
         static const int16_t undefined2ByteDouble=0x7ffe;
@@ -335,24 +338,24 @@ class SNMEA2000 {
         bool clearRXFilter();
         bool setupRXFilter();
         int getPgmSize(const char *str, int maxLen);
-        void print_uint64_t(uint64_t num);
+        //void print_uint64_t(uint64_t num);
 
-        void print(tUnionDeviceInformation * devInfo) {
-            console->print(F("  UniqueNumber:"));
-            console->println(devInfo->unicNumberAndManCode&0x1fffff);
-            console->print(F("  ManufacturersCode:"));
-            console->println((devInfo->unicNumberAndManCode>>21)&0x7ff);
-            console->print(F("  deviceInstance:"));
-            console->println(devInfo->deviceInstance, DEC);
-            console->print(F("  deviceFunction:"));
-            console->println(devInfo->deviceFunction, DEC);
-            console->print(F("  deviceClass:"));
-            console->println((devInfo->deviceClass>>1)&0x7f, DEC);
-            console->print(F("  industryGroup:"));
-            console->println((devInfo->industryGroupAndSystemInstance>>4)&0x07, DEC);
-            console->print(F("  systemInstance:"));
-            console->println((devInfo->industryGroupAndSystemInstance>>4)&0x0f, DEC);
-        };
+        //void print(tUnionDeviceInformation * devInfo) {
+        //    console->print(F("  UniqueNumber:"));
+        //    console->println(devInfo->unicNumberAndManCode&0x1fffff);
+        //    console->print(F("  ManufacturersCode:"));
+        //    console->println((devInfo->unicNumberAndManCode>>21)&0x7ff);
+        //    console->print(F("  deviceInstance:"));
+        //    console->println(devInfo->deviceInstance, DEC);
+        //    console->print(F("  deviceFunction:"));
+        //    console->println(devInfo->deviceFunction, DEC);
+        //    console->print(F("  deviceClass:"));
+        //    console->println((devInfo->deviceClass>>1)&0x7f, DEC);
+        //    console->print(F("  industryGroup:"));
+        //    console->println((devInfo->industryGroupAndSystemInstance>>4)&0x07, DEC);
+        //    console->print(F("  systemInstance:"));
+        //    console->println((devInfo->industryGroupAndSystemInstance>>4)&0x0f, DEC);
+        //};
 
 
         unsigned char deviceAddress;
@@ -363,19 +366,20 @@ class SNMEA2000 {
         const unsigned long *rxPGNList;
         MCP_CAN CAN;
         bool (*isoRequestHandler)(unsigned long requestedPGN, MessageHeader *messageHeader, byte * buffer, int len) = NULL;
+        void (*messageHandler)(MessageHeader *messageHeader, byte * buffer, int len) = NULL;
         unsigned long addressClaimStarted=0;
         //output buffer and frames
-        MessageHeader *packetMessageHeader;
-        bool fastPacket;
+        MessageHeader *packetMessageHeader = NULL;
+        bool fastPacket = false;
         bool rxFiltersSet = false;
         bool diagnostics = false;
         bool canIsOpen = false;
-        uint8_t fastPacketSequence;
-        int16_t fastPacketSent;
-        int16_t fastPacketLength;
-        byte buffer[8];
-        uint8_t frame;
-        uint8_t ob;
+        uint8_t fastPacketSequence = 0;
+        int16_t fastPacketSent = 0;
+        int16_t fastPacketLength = 0;
+        byte buffer[8] = {0,0,0,0,0,0,0,0};
+        uint8_t frame = 0;
+        uint8_t ob = 0;
         uint16_t messagesRecieved = 0;
         uint16_t messagesSent = 0;
         uint16_t packetErrors = 0;

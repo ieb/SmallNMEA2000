@@ -41,50 +41,55 @@ void SNMEA2000::processMessages() {
         MessageHeader messageHeader(CAN.getCanId());
         messagesRecieved++;
         switch (messageHeader.pgn) {
-          case 59392L: /*ISO Acknowledgement*/
-            if ( diagnostics ) {
-                console->print(F("can: <ack"));
-                messageHeader.print(console, buf,len);
-            }
-            break;
+            //
+          //case 59392L: /*ISO Acknowledgement* /
+            //if ( diagnostics ) {
+            //    console->print(F("can: <ack"));
+            //    messageHeader.print(console, buf,len);
+            //}
+            //break;
           case 59904L: /*ISO Request*/
-            if ( diagnostics ) {
-                console->print(F("can: <req"));
-                messageHeader.print(console, buf,len);
-            }
+            //if ( diagnostics ) {
+            //    console->print(F("can: <req"));
+            //    messageHeader.print(console, buf,len);
+            //}
             handleISORequest(&messageHeader, buf, len);
             break;
           case 60928L: /*ISO Address Claim*/
-            if ( diagnostics ) {
-                console->print(F("can: <claim"));
-                messageHeader.print(console, buf,len);
-            }
+            //if ( diagnostics ) {
+            //    console->print(F("can: <claim"));
+            //    messageHeader.print(console, buf,len);
+            //}
             handleISOAddressClaim(&messageHeader, buf, len);
             break;
+
           default:
-            if ( diagnostics ) {
-                console->print(F("can: <unknown"));
-                messageHeader.print(console, buf,len);
+            if ( messageHandler != NULL) {
+                messageHandler(&messageHeader, buf, len);
             }
+            //if ( diagnostics ) {
+            //    console->print(F("can: <unknown"));
+            //    messageHeader.print(console, buf,len);
+            //}
         }
     }
 }
 
-void SNMEA2000::print_uint64_t(uint64_t num) {
-
-  char rev[128]; 
-  char *p = rev+1;
-
-  while (num > 0) {
-    *p++ = '0' + ( num % 10);
-    num/= 10;
-  }
-  p--;
-  /*Print the number which is now in reverse*/
-  while (p > rev) {
-    console->print(*p--);
-  }
-}
+//void SNMEA2000::print_uint64_t(uint64_t num) {
+//
+//  char rev[128]; 
+//  char *p = rev+1;
+//
+//  while (num > 0) {
+//    *p++ = '0' + ( num % 10);
+//    num/= 10;
+//  }
+//  p--;
+//  /*Print the number which is now in reverse*/
+//  while (p > rev) {
+//    console->print(*p--);
+//  }
+//}
 
 
 void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffer, int len) {
@@ -92,12 +97,13 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
     tUnionDeviceInformation * remoteDeviceInfo = (tUnionDeviceInformation *)(&buffer[0]);
     if ( messageHeader->source == deviceAddress ) {
         // annother device is claiming this address 
-        console->print(F("can: 2 node claiming this address. local:"));
-        print_uint64_t(devInfo->getName());
-        console->print(F(" remote:"));
-        print_uint64_t(remoteDeviceInfo->name);
-        console->print(F(" msg:"));
-        messageHeader->print(console, buffer, len);
+
+        //console->print(F("can: 2 node claiming this address. local:"));
+        //print_uint64_t(devInfo->getName());
+        //console->print(F(" remote:"));
+        //print_uint64_t(remoteDeviceInfo->name);
+        //console->print(F(" msg:"));
+        //messageHeader->print(console, buffer, len);
         if (devInfo->getName() == remoteDeviceInfo->name ) { 
             // should not happen. This means that we have a collision of 2 of the same devices on the same bus 
             // with the same device instance number in the name.
@@ -105,18 +111,18 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
             // and try again. For some devices, the instance number is used in the messages eg BatteryInstance but for
             // most of devices based on this library thats not the case, and its not currently possible to 
             // set the instance number using NMEA2000 group functions.
-            console->println(F("can: Claim from remote is identical, duplicate device names "));
+            //console->println(F("can: Claim from remote is identical, duplicate device names "));
             uint8_t newInstance = 0xfe & millis();
             devInfo->setDeviceInstanceNumber(newInstance);
-            console->print(F("can: Device Instances set to  "));
-            console->println(newInstance, DEC);
+            //console->print(F("can: Device Instances set to  "));
+            //console->println(newInstance, DEC);
         } else if (devInfo->getName() > remoteDeviceInfo->name ) { 
             // but our name is > callers so we must increment address and claim
             // 
-            console->println(F("can: Claim from remote has higher precidence"));
+            //console->println(F("can: Claim from remote has higher precidence"));
             deviceAddress++;
         } else {
-            console->println(F("can: Claim from remote has lower precidence"));
+            //console->println(F("can: Claim from remote has lower precidence"));
         }
         claimAddress();
     }
@@ -127,19 +133,19 @@ void SNMEA2000::claimAddress() {
     rxFiltersSet = true;
     sendIsoAddressClaim();
     addressClaimStarted = millis();
-    console->print(F("Send Address claim for:"));
-    console->print(deviceAddress);
-    console->print(F(" at "));
-    console->println(addressClaimStarted);
+    //console->print(F("Send Address claim for:"));
+    //console->print(deviceAddress);
+    //console->print(F(" at "));
+    //console->println(addressClaimStarted);
 }
 
 bool SNMEA2000::hasClaimedAddress() {
     if ( (addressClaimStarted != 0) && 
          (millis()-addressClaimStarted > 250)  ) {
-        console->print(F("Address claimed as "));
-        console->print(deviceAddress);
-        console->print(F(" at "));
-        console->println(millis());
+        //console->print(F("Address claimed as "));
+        //console->print(deviceAddress);
+        //console->print(F(" at "));
+        //console->println(millis());
         rxFiltersSet = setupRXFilter();
         addressClaimStarted = 0;
     }
@@ -174,8 +180,8 @@ void SNMEA2000::handleISORequest(MessageHeader *messageHeader, byte * buffer, in
         break;
       default:
         if ( isoRequestHandler == NULL || !isoRequestHandler(requestedPGN, messageHeader, buffer, len) ) {
-            console->print(F("Not Known"));
-            console->println(requestedPGN);
+            //console->print(F("Not Known"));
+            //console->println(requestedPGN);
             sendIsoAcknowlegement(messageHeader, 1, 0xff);
         }
     }
@@ -282,6 +288,11 @@ void SNMEA2000::output2ByteInt(uint16_t i) {
     outputByte((i>>8)&0xff);
 }
 void SNMEA2000::output3ByteInt(int32_t i) {
+    outputByte(i&0xff);
+    outputByte((i>>8)&0xff);
+    outputByte((i>>16)&0xff);
+}
+void SNMEA2000::output3ByteUInt(uint32_t i) {
     outputByte(i&0xff);
     outputByte((i>>8)&0xff);
     outputByte((i>>16)&0xff);
@@ -568,10 +579,10 @@ void SNMEA2000::sendMessage(MessageHeader *messageHeader, byte * message, int le
         console->print(F("can: err"));
         console->println(res);
     }
-    if ( diagnostics ) {
-        console->print(F("can: out>"));
-        messageHeader->print(console, message,length);
-    }
+    //if ( diagnostics ) {
+    //    console->print(F("can: out>"));
+    //    messageHeader->print(console, message,length);
+    //}
     messagesSent++;
 
 }
