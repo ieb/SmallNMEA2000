@@ -42,7 +42,11 @@ Using a CandelLite USB-CAN bus adapter with socket can on a linux box. see tests
 
 Details of ISO Address Claim https://copperhilltech.com/blog/sae-j1939-address-management-messages-request-for-address-claimed-and-address-claimed/
 
+# Changes
 
+## 20250627
+
+Was found that the mast and filters in the chip were non functional blocking all traffic after address claim. Since in most cases with NMEA2000 the range of packets recieved is too great to be accomidated in the filters, filtering has been moved into code. This may not be fast enough with full busload and needs to be tested. Dropped packets in the chip may not matter so much. In addition the rxPGNList and txPGNList must now be in ram not PROGMEM to allow rapid checks. The length of these must also be supplied. This will mean some code changes after this change.
 
 
 # ToDO
@@ -52,5 +56,6 @@ Details of ISO Address Claim https://copperhilltech.com/blog/sae-j1939-address-m
 * [x] Deal with name clashes on address claims
 * [x] Test triggering address claim 
 * [x] Fix some errors in unsigned and signed messages, firmware updates not required, see previous commit.
+* [x] Drop non functional register level filters and replace with recieved list checks. Note, this may not be fast enough.
 
 
