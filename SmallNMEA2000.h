@@ -59,8 +59,10 @@ byte configurationInformation[] PROGMEM = {
  *  They are RX and TX by the SNMEA2000 class but we need to get them into 
  *  a contiguous memory space in program memory.
  */ 
-#define SNMEA200_DEFAULT_TX_PGN 126464L,60928L,126996L,126998L,59392L,0L
-#define SNMEA200_DEFAULT_RX_PGN 59392L,59904L,60928L,0L
+#define SNMEA200_DEFAULT_TX_PGN 126464L,60928L,126996L,126998L,59392L
+#define SNMEA200_DEFAULT_TX_PGN_LEN 5
+#define SNMEA200_DEFAULT_RX_PGN 59392L,59904L,60928L
+#define SNMEA200_DEFAULT_RX_PGN_LEN 3
 
 // from NMEA2000 library, makes it much easier creating the name.
 
@@ -159,83 +161,14 @@ typedef struct SNMEA2000ConfigInfo {
 
 class MessageHeader {
     public:
-       MessageHeader(unsigned long ID) {
-            // CAN ID is 29 bits long
-            // 111 1 1 11111111 11111111 11111111
-            //                           -------- Source Addresss 8 bits @0
-            //                  -------- PDU specific 8 bits @ 8
-            //         -------- PDU Format 8 bits @ 16
-            //       - Data Page 1 but @24
-            //     - reserved 1 bit @25
-            // --- priority (3 bits starting @26)
-
-            // PDU Format < 240 is transmitted with a destination address, which is in 8 bits 8
-            // PDU Format 240 > 255 is a broadcast with the Group extension in 8 bits @8.
-            id = ID;
-            unsigned char canIdPF = (unsigned char) (id >> 16);
-            unsigned char canIdPS = (unsigned char) (id >> 8);
-            unsigned char canIdDP = (unsigned char) (id >> 24) & 1;
-
-            source = (unsigned char) id >> 0;
-            priority = (unsigned char) ((id >> 26) & 0x7);
-
-            if (canIdPF < 240) {
-            /* PDU1 format, the PS contains the destination address */
-                destination = canIdPS;
-                pgn = (((unsigned long)canIdDP) << 16) | (((unsigned long)canIdPF) << 8);
-            } else {
-            /* PDU2 format, the destination is implied global and the PGN is extended */
-                destination = 0xff;
-                pgn = (((unsigned long)canIdDP) << 16) | (((unsigned long)canIdPF) << 8) | (unsigned long)canIdPS;
-            }
-       };
-       MessageHeader(unsigned long PGN, unsigned char Priority, unsigned char Source, unsigned char Destination) {
-           // from NMEA2000 code base.
-           pgn = PGN;
-           priority = Priority;
-           source = Source;
-           destination = Destination;
-           unsigned char canIdPF = (unsigned char) (PGN >> 8);
-
-            if (canIdPF < 240) {  // PDU1 format
-                if ( (PGN & 0xff) != 0 ) {
-                    id = 0;
-                } else {
-                    id = ( ((unsigned long)(priority & 0x7))<<26 | pgn<<8 | ((unsigned long)Destination)<<8 | (unsigned long)Source);
-                }
-            } else { // PDU2 format
-                id = ( ((unsigned long)(priority & 0x7))<<26 | pgn<<8 | (unsigned long)Source);
-            }
-       };
-
-       // |-| Priority
-
-       // PDU1 format    DDSS
-       void print(Print *console, byte *buf, int len) {
-             console->print(":");
-             console->print(pgn);
-             console->print(",");
-             console->print(source);
-             console->print(",");
-             console->print(destination);
-             console->print(",");
-             console->print(priority);
-             console->print(",");
-             console->print(len);
-             console->print(",");
-             console->print(id,HEX);
-             for (int i = 0; i < len; i++) {
-                 console->print(",");
-                 console->print(buf[i],HEX);
-             }
-             console->println(";");
-       }
-
-       unsigned long id;
-       unsigned long pgn;
-       unsigned char priority;
-       unsigned char source;
-       unsigned char destination;
+        MessageHeader(unsigned long ID, unsigned long PGN);
+        MessageHeader(unsigned long PGN, unsigned char Priority, unsigned char Source, unsigned char Destination);
+        void print(Print *console, byte *buf, int len);
+        unsigned long id;
+        unsigned long pgn;
+        unsigned char priority;
+        unsigned char source;
+        unsigned char destination;
 };
 
 
@@ -247,7 +180,9 @@ class SNMEA2000 {
         const SNMEA2000ProductInfo * pinfo, 
         const SNMEA2000ConfigInfo * cinfo,
         const unsigned long *tx,
+        const uint8_t txLen,
         const unsigned long *rx,
+        const uint8_t rxLen,
         const uint8_t csPin,
         Print * console = &Serial
         ): 
@@ -256,7 +191,9 @@ class SNMEA2000 {
         productInfo{pinfo},
         configInfo{cinfo},
         txPGNList{tx},
-        rxPGNList{rx} ,
+        rxPGNList{rx},
+        txListLen{txLen},
+        rxListLen{rxLen},
         CAN{csPin},
         console{console}
         {
@@ -271,6 +208,8 @@ class SNMEA2000 {
             console->print(messagesSent);
             console->print(F(" recieved="));
             console->print(messagesRecieved);
+            console->print(F(" dropped="));
+            console->print(messagesDropped);
             console->print(F(" packet errors="));
             console->print(packetErrors);
             console->print(F(" frame errors="));
@@ -330,13 +269,11 @@ class SNMEA2000 {
         bool hasClaimedAddress();
         void handleISORequest(MessageHeader *messageHeader, byte * buffer, int len);
         void sendPGNLists(MessageHeader *requestMessageHeader);
-        void sendPGNList(MessageHeader *messageHeader, int listType, const unsigned long *pgnList);
+        void sendPGNList(MessageHeader *messageHeader, int listType, const unsigned long *pgnList, uint8_t len);
         void sendIsoAddressClaim();
         void sendProductInformation(MessageHeader *requestMessageHeader);
         void sendConfigurationInformation(MessageHeader *requestMessageHeader);
         void sendIsoAcknowlegement(MessageHeader *requestMessageHeader, byte control, byte groupFunction);
-        bool clearRXFilter();
-        bool setupRXFilter();
         int getPgmSize(const char *str, int maxLen);
         //void print_uint64_t(uint64_t num);
 
@@ -364,6 +301,8 @@ class SNMEA2000 {
         const SNMEA2000ConfigInfo * configInfo;
         const unsigned long *txPGNList;
         const unsigned long *rxPGNList;
+        const uint8_t txListLen;
+        const uint8_t rxListLen;
         MCP_CAN CAN;
         bool (*isoRequestHandler)(unsigned long requestedPGN, MessageHeader *messageHeader, byte * buffer, int len) = NULL;
         void (*messageHandler)(MessageHeader *messageHeader, byte * buffer, int len) = NULL;
@@ -371,7 +310,6 @@ class SNMEA2000 {
         //output buffer and frames
         MessageHeader *packetMessageHeader = NULL;
         bool fastPacket = false;
-        bool rxFiltersSet = false;
         bool diagnostics = false;
         bool canIsOpen = false;
         uint8_t fastPacketSequence = 0;
@@ -381,6 +319,7 @@ class SNMEA2000 {
         uint8_t frame = 0;
         uint8_t ob = 0;
         uint16_t messagesRecieved = 0;
+        uint16_t messagesDropped = 0;
         uint16_t messagesSent = 0;
         uint16_t packetErrors = 0;
         uint16_t frameErrors = 0;
@@ -399,9 +338,11 @@ class PressureMonitor : public SNMEA2000 {
         const SNMEA2000ProductInfo * pinfo, 
         const SNMEA2000ConfigInfo * cinfo,
         const unsigned long *tx,
+        const uint8_t txLen,
         const unsigned long *rx,
+        const uint8_t rxLen,
         const uint8_t csPin
-        ): SNMEA2000{addr, devInfo, pinfo, cinfo, tx, rx, csPin} {};
+        ): SNMEA2000{addr, devInfo, pinfo, cinfo, tx, txLen, rx, rxLen, csPin} {};
 
     /**
      * @brief PGN 130310 
@@ -478,9 +419,11 @@ class EngineMonitor : public SNMEA2000 {
         const SNMEA2000ProductInfo * pinfo, 
         const SNMEA2000ConfigInfo * cinfo,
         const unsigned long *tx,
+        const uint8_t txLen,
         const unsigned long *rx,
+        const uint8_t rxLen,
         const uint8_t csPin
-        ): SNMEA2000{addr, devInfo, pinfo, cinfo, tx, rx, csPin} {};
+        ): SNMEA2000{addr, devInfo, pinfo, cinfo, tx, txLen, rx, rxLen, csPin} {};
     /**
      * RapidEngine Data - PGN 127488, standard packet
      * enginInstance starting a 0

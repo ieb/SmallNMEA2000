@@ -4,6 +4,84 @@
 #include "SmallNMEA2000.h"
 
 
+unsigned long getPgnId(unsigned long ID) {
+    // CAN ID is 29 bits long
+    // 111 1 1 11111111 11111111 11111111
+    //                           -------- Source Addresss 8 bits @0
+    //                  -------- PDU specific 8 bits @ 8  this is canIdPS
+    //         -------- PDU Format 8 bits @ 16 this is canIdPF
+    //       - Data Page 1 but @24 this is canIdDP
+    //     - reserved 1 bit @25
+    // --- priority (3 bits starting @26)
+
+    // PDU Format < 240 is transmitted with a destination address, which is in 8 bits 8
+    // PDU Format 240 > 255 is a broadcast with the Group extension in 8 bits @8.
+    unsigned char canIdPF = (unsigned char) (ID >> 16); // PDU Format
+    unsigned char canIdPS = (unsigned char) (ID >> 8);  // PDU Specific
+    unsigned char canIdDP = (unsigned char) (ID >> 24) & 1; // Data Page
+
+    if (canIdPF < 240) {
+    /* PDU1 format, the PS contains the destination address */
+        return (((unsigned long)canIdDP) << 16) | (((unsigned long)canIdPF) << 8);
+    } else {
+    /* PDU2 format, the destination is implied global and the PGN is extended */
+        return (((unsigned long)canIdDP) << 16) | (((unsigned long)canIdPF) << 8) | (unsigned long)canIdPS;
+    }        
+};
+MessageHeader::MessageHeader(unsigned long ID, unsigned long PGN) {
+    pgn = PGN;
+    id = ID;
+    source = (unsigned char) id & 0xff;
+    priority = (unsigned char) ((id >> 26) & 0x7);
+    unsigned char canIdPF = (unsigned char) (id >> 16);
+    if (canIdPF < 240) {
+        destination = (unsigned char) (id >> 8);
+    } else {
+        destination = 0xff;
+    }
+};
+
+MessageHeader::MessageHeader(unsigned long PGN, unsigned char Priority, unsigned char Source, unsigned char Destination) {
+   // from NMEA2000 code base.
+   pgn = PGN;
+   priority = Priority;
+   source = Source;
+   destination = Destination;
+   unsigned char canIdPF = (unsigned char) (PGN >> 8);
+
+    if (canIdPF < 240) {  // PDU1 format
+        if ( (PGN & 0xff) != 0 ) {
+            id = 0;
+        } else {
+            id = ( ((unsigned long)(priority & 0x7))<<26 | pgn<<8 | ((unsigned long)Destination)<<8 | (unsigned long)Source);
+        }
+    } else { // PDU2 format
+        id = ( ((unsigned long)(priority & 0x7))<<26 | pgn<<8 | (unsigned long)Source);
+    }
+};
+
+// |-| Priority
+
+// PDU1 format    DDSS
+void MessageHeader::print(Print *console, byte *buf, int len) {
+     console->print(":");
+     console->print(pgn);
+     console->print(",");
+     console->print(source);
+     console->print(",");
+     console->print(destination);
+     console->print(",");
+     console->print(priority);
+     console->print(",");
+     console->print(len);
+     console->print(",");
+     console->print(id,HEX);
+     for (int i = 0; i < len; i++) {
+         console->print(",");
+         console->print(buf[i],HEX);
+     }
+     console->println(";");
+}
 
 
 
@@ -13,6 +91,16 @@ bool SNMEA2000::open(byte clockSet) {
     }
     uint8_t res =  CAN.begin(CAN_250KBPS, clockSet);
     if (res == CAN_OK ) {
+        // in most cases setting filters on the chip  with NMEA2000 doesnt work
+        // where the range of PGNs is enough to set all bits.
+        // also the filters are persistant.
+        if ( CAN.init_Mask(0,1,0x0)  != MCP2515_OK ) {
+            return false;
+        }
+        if ( CAN.init_Mask(1,1,0x0)  != MCP2515_OK ) {
+            return false;
+        }
+
         canIsOpen = true;
         delay(200);
         claimAddress();
@@ -38,28 +126,35 @@ void SNMEA2000::processMessages() {
     while(frames < 20 && CAN_MSGAVAIL == CAN.checkReceive()){
         frames++;
         CAN.readMsgBuf(&len, buf);    // read data,  len: data length, buf: data buf
-        MessageHeader messageHeader(CAN.getCanId());
+        unsigned long canId = CAN.getCanId();
+        unsigned long pgn = getPgnId(canId);
+        uint8_t i = 0;
+        for (; i < rxListLen; i++) {
+            if (rxPGNList[i] == pgn) {
+                break;
+            }
+        }
+        if (i == rxListLen) {
+            messagesDropped++;
+            continue;
+        }
         messagesRecieved++;
-        switch (messageHeader.pgn) {
-            //
-          //case 59392L: /*ISO Acknowledgement* /
-            //if ( diagnostics ) {
-            //    console->print(F("can: <ack"));
-            //    messageHeader.print(console, buf,len);
-            //}
-            //break;
+        MessageHeader messageHeader(canId, pgn);
+        if ( diagnostics ) {
+            console->print(F("can:"));
+            switch(pgn) {
+                case 59392L: console->print(F("<a")); break;
+                case 59904L: console->print(F("<r")); break;
+                case 60928L: console->print(F("<c")); break;
+                default: console->print(F("<o")); break;
+            }
+            messageHeader.print(console, buf, len);
+        }
+        switch (pgn) {
           case 59904L: /*ISO Request*/
-            //if ( diagnostics ) {
-            //    console->print(F("can: <req"));
-            //    messageHeader.print(console, buf,len);
-            //}
             handleISORequest(&messageHeader, buf, len);
             break;
           case 60928L: /*ISO Address Claim*/
-            //if ( diagnostics ) {
-            //    console->print(F("can: <claim"));
-            //    messageHeader.print(console, buf,len);
-            //}
             handleISOAddressClaim(&messageHeader, buf, len);
             break;
 
@@ -67,16 +162,13 @@ void SNMEA2000::processMessages() {
             if ( messageHandler != NULL) {
                 messageHandler(&messageHeader, buf, len);
             }
-            //if ( diagnostics ) {
-            //    console->print(F("can: <unknown"));
-            //    messageHeader.print(console, buf,len);
-            //}
         }
     }
 }
 
 //void SNMEA2000::print_uint64_t(uint64_t num) {
-//
+// RAM:   [===       ]  32.7% (used 669 bytes from 2048 bytes)
+// Flash: [========= ]  92.7% (used 28474 bytes from 30720 bytes)
 //  char rev[128]; 
 //  char *p = rev+1;
 //
@@ -129,8 +221,6 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
 }
 
 void SNMEA2000::claimAddress() {
-    clearRXFilter();
-    rxFiltersSet = true;
     sendIsoAddressClaim();
     addressClaimStarted = millis();
     //console->print(F("Send Address claim for:"));
@@ -146,7 +236,6 @@ bool SNMEA2000::hasClaimedAddress() {
         //console->print(deviceAddress);
         //console->print(F(" at "));
         //console->println(millis());
-        rxFiltersSet = setupRXFilter();
         addressClaimStarted = 0;
     }
     return (addressClaimStarted==0);
@@ -196,19 +285,17 @@ void SNMEA2000::sendPGNLists(MessageHeader *requestMessageHeader) {
     MessageHeader messageHeader(126464L, 6, deviceAddress, requestMessageHeader->source);
     // 126464L structure is a fast packet sequence with the
     // total length is 1+npgns*3
-    sendPGNList(&messageHeader, 0, txPGNList);
-    sendPGNList(&messageHeader, 1, rxPGNList);
+    sendPGNList(&messageHeader, 0, txPGNList, rxListLen);
+    sendPGNList(&messageHeader, 1, rxPGNList, txListLen);
 }
 
 
 
-void SNMEA2000::sendPGNList(MessageHeader *messageHeader, int listType, const unsigned long *pgnList) {
-    int ipgn = 0; // pgn length
-    while(pgm_read_dword(&pgnList[ipgn++]) !=0 );
-    startFastPacket(messageHeader, 1+ipgn*3);
+void SNMEA2000::sendPGNList(MessageHeader *messageHeader, int listType, const unsigned long *pgnList, uint8_t len ) {
+    startFastPacket(messageHeader, 1+len*3);
     outputByte(listType); // RX PGN List
-    for(int i = 0; i < ipgn; i++) {
-        output3ByteInt(pgm_read_dword(&pgnList[i]));
+    for(int i = 0; i < len; i++) {
+        output3ByteInt(pgnList[i]);
     }
     finishFastPacket();
 }
@@ -397,71 +484,9 @@ void SNMEA2000::output4ByteUDouble(double value, double precision) {
     }
 }
 
-bool SNMEA2000::setupRXFilter() {
-        // CAN ID is 29 bits long
-        // 111 1 1 11111111 11111111 11111111
-        //                           -------- Source Addresss 8 bits @0
-        //                  -------- PDU specific 8 bits @ 8
-        //         -------- PDU Format 8 bits @ 16
-        //       - Data Page 1 bit @24
-        //     - reserved 1 bit @25
-        // --- priority (3 bits starting @26)
-
-        // PDU Format < 240 is transmitted with a destination address, which is in 8 bits 8
-        // PDU Format 240 > 255 is a broadcast with the Group extension in 8 bits @8.
-
-        // For all PDU < 240 we are only interested destination addresses
-        // of our destination or 0xff.
-        // For all PDU's >= 240 then we are only interested in packets matching
-        // the recieved PGNS.
-
-        // since we interested in 0xff messages, then that makes the mask and filter for the PSU specific part as 0xff 0xff which 
-        // 
-
-        // 59392L == 11101000 00000000 232 PDU1
-        // 59904L == 11101010 00000000 234 PDU1
-        // 60928L == 11101110 00000000 238 PDU1
-        //
-        // Accept for our device and 0xfff
-        // Mask                 11111001 11111111 00000000  = 0xf9ff00
-        // Filter 59392L to us  11101000 <our device> 00000000
-        // Filter 59392L to 0xff  11101000 11111111 00000000
-        // Filter 59904L to 0xff  11101010 11111111 00000000
-        // Filter 60928L to 0xff  11101110 11111111 00000000
 
 
 
-        
-        bool ret = true;
-        if (CAN.init_Mask(0,1,0xf9ff00) != MCP2515_OK) {
-            ret = false;
-        }
-        if (CAN.init_Mask(1,1,0xf9ff00) != MCP2515_OK ) {
-            ret = false;
-        } 
-        // broadcasts
-        if (CAN.init_Filt(0,1,0xE8FF00) != MCP2515_OK ) {
-            ret = false;
-        } 
-        // thisDevice
-       if (CAN.init_Filt(1,1,0xE80000 | (((uint16_t)deviceAddress<<8)&0xff00)) != MCP2515_OK ) {
-            ret = false;
-       }
-    return ret;
-}
-
-
-
-bool SNMEA2000::clearRXFilter() {
-    bool ret = true;
-    if ( CAN.init_Mask(0,1,0x0)  != MCP2515_OK ) {
-        ret = false;
-    }
-    if ( CAN.init_Mask(1,1,0x0)  != MCP2515_OK ) {
-        ret = false;
-    }
-    return ret;
-}
 
 
 
