@@ -665,6 +665,23 @@ void EngineMonitor::sendEngineDynamicParamMessage(
     finishFastPacket();
 
 }
+
+void EngineMonitor::sendTransmissionDynamicParamMessage(
+    byte engineInstance,
+    byte transissionGear,
+    double transmissionOilPressure,
+    double transmissionOilTemperature,
+    byte status    
+) {
+    MessageHeader messageHeader(127493L, 2, getAddress(), SNMEA2000::broadcastAddress);
+    startPacket(&messageHeader);
+    outputByte(engineInstance);
+    outputByte(transissionGear);
+    output2ByteUDouble(transmissionOilPressure,100);
+    output2ByteUDouble(transmissionOilTemperature,0.01);
+    outputByte(status);
+    finishPacket();
+}
 void EngineMonitor::sendDCBatterStatusMessage(
     byte batteryInstance, 
     byte sid,

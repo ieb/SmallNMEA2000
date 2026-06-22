@@ -468,6 +468,22 @@ class EngineMonitor : public SNMEA2000 {
         byte engineLoad = SNMEA2000::n2kInt8NA, // %
         byte engineTorque = SNMEA2000::n2kInt8NA // %
         );
+
+    /**
+     * EngineDynamicParams - PGN 127493
+     * engineInstance starting at 0
+     * transissionGear  0 = Forward, 1 = Neutral, 2 = Reverse
+     * transmissionOilPressure in Pascal
+     * transmissionOilTemperature in K
+     * status bitmap
+     */ 
+    void EngineMonitor::sendTransmissionDynamicParamMessage(
+        byte engineInstance = 0,
+        byte transissionGear = SNMEA2000::n2kInt8NA,
+        double transmissionOilPressure = SNMEA2000::n2kDoubleNA, // Pa
+        double transmissionOilTemperature = SNMEA2000::n2kDoubleNA, // K
+        byte status = SNMEA2000::n2kInt8NA 
+        );       
     /**
      * DC Battery Status PGN 127508
      * batteryInstance starting a 0
