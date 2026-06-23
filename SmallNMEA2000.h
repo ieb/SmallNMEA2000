@@ -477,7 +477,7 @@ class EngineMonitor : public SNMEA2000 {
      * transmissionOilTemperature in K
      * status bitmap
      */ 
-    void EngineMonitor::sendTransmissionDynamicParamMessage(
+    void sendTransmissionDynamicParamMessage(
         byte engineInstance = 0,
         byte transissionGear = SNMEA2000::n2kInt8NA,
         double transmissionOilPressure = SNMEA2000::n2kDoubleNA, // Pa

@@ -186,6 +186,7 @@ void SNMEA2000::processMessages() {
 
 void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffer, int len) {
     if ( messageHeader->source == 254 ) return; // annother node cannot claim an address, ignore this.
+    if ( len < 8 ) return; // a valid address claim carries the full 8-byte NAME
     tUnionDeviceInformation * remoteDeviceInfo = (tUnionDeviceInformation *)(&buffer[0]);
     if ( messageHeader->source == deviceAddress ) {
         // annother device is claiming this address 
@@ -208,11 +209,13 @@ void SNMEA2000::handleISOAddressClaim(MessageHeader *messageHeader, byte * buffe
             devInfo->setDeviceInstanceNumber(newInstance);
             //console->print(F("can: Device Instances set to  "));
             //console->println(newInstance, DEC);
-        } else if (devInfo->getName() > remoteDeviceInfo->name ) { 
+        } else if (devInfo->getName() > remoteDeviceInfo->name ) {
             // but our name is > callers so we must increment address and claim
-            // 
+            //
             //console->println(F("can: Claim from remote has higher precidence"));
-            deviceAddress++;
+            // Valid claimable addresses are 0..251; wrap before reaching the
+            // reserved/null (252,253), cannot-claim (254) and broadcast (255).
+            deviceAddress = (deviceAddress >= 251) ? 0 : deviceAddress + 1;
         } else {
             //console->println(F("can: Claim from remote has lower precidence"));
         }
@@ -285,8 +288,8 @@ void SNMEA2000::sendPGNLists(MessageHeader *requestMessageHeader) {
     MessageHeader messageHeader(126464L, 6, deviceAddress, requestMessageHeader->source);
     // 126464L structure is a fast packet sequence with the
     // total length is 1+npgns*3
-    sendPGNList(&messageHeader, 0, txPGNList, rxListLen);
-    sendPGNList(&messageHeader, 1, rxPGNList, txListLen);
+    sendPGNList(&messageHeader, 0, txPGNList, txListLen);
+    sendPGNList(&messageHeader, 1, rxPGNList, rxListLen);
 }
 
 
@@ -392,7 +395,7 @@ void SNMEA2000::output2ByteDouble(double value, double precision) {
     } else {
         double vd=value/precision;
         vd = round(vd);
-        int16_t i = (vd>=-32768 && vd<0x7fee)?(int16_t)vd:0x7fee;
+        int16_t i = (vd>=-32750 && vd<0x7fee)?(int16_t)vd:0x7fee;
         outputByte(i&0xff);
         outputByte((i>>8)&0xff);
     }
@@ -405,7 +408,7 @@ void SNMEA2000::output2ByteUDouble(double value, double precision) {
     } else {
         double vd=value/precision;
         vd = round(vd);
-        uint16_t i = (vd>=0 && vd<0xfffe)?(int16_t)vd:0xfffe;
+        uint16_t i = (vd>=0 && vd<0xfffe)?(uint16_t)vd:0xfffe;
         outputByte(i&0xff);
         outputByte((i>>8)&0xff);
     }
@@ -453,7 +456,7 @@ void SNMEA2000::output4ByteDouble(double value, double precision) {
     } else {
         double vd=value/precision;
         vd = round(vd);
-        int32_t i = (vd>=-2147483648L && vd<2147483647L)?(int32_t)vd:2147483647L;
+        int32_t i = (vd>=-2147483646L && vd<2147483646L)?(int32_t)vd:2147483647L;
         outputByte(i&0xff);
         outputByte((i>>8)&0xff);
         outputByte((i>>16)&0xff);
@@ -544,8 +547,12 @@ void SNMEA2000::checkFastPacket() {
 void SNMEA2000::finishFastPacket() {
     if (fastPacket ) {
         if (ob > 1) {
-            // send remaining frame
-            sendMessage(packetMessageHeader, buffer, ob);
+            // NMEA2000 fast-packet frames are always 8 bytes on the wire;
+            // pad the trailing frame with 0xff so strict gateways accept it.
+            while (ob < 8) {
+                buffer[ob++] = 0xff;
+            }
+            sendMessage(packetMessageHeader, buffer, 8);
         }
     } else {
         packetErrors++;
@@ -556,11 +563,13 @@ void SNMEA2000::finishFastPacket() {
 void SNMEA2000::outputByte(byte opb) {
     if ( ob < 8 ) {
         buffer[ob++] = opb;
-        fastPacketLength--;
-        if( fastPacket && ob == 8) {
-            sendMessage(packetMessageHeader, &buffer[0], 8);
-            ob = 0;
-            buffer[ob++] = (fastPacketSequence << 5) | frame++;
+        if ( fastPacket ) {
+            fastPacketSent++;
+            if ( ob == 8 ) {
+                sendMessage(packetMessageHeader, &buffer[0], 8);
+                ob = 0;
+                buffer[ob++] = (fastPacketSequence << 5) | frame++;
+            }
         }
     } else {
         frameErrors++;
@@ -680,6 +689,7 @@ void EngineMonitor::sendTransmissionDynamicParamMessage(
     output2ByteUDouble(transmissionOilPressure,100);
     output2ByteUDouble(transmissionOilTemperature,0.01);
     outputByte(status);
+    outputByte(0x00);
     finishPacket();
 }
 void EngineMonitor::sendDCBatterStatusMessage(
@@ -705,7 +715,7 @@ void EngineMonitor::sendFluidLevelMessage(
     double capacity) {
     MessageHeader messageHeader(127505L, 6, getAddress(), SNMEA2000::broadcastAddress);
     startPacket(&messageHeader);
-    byte b = ((type<<4)&0xff)|(instance&0xff);
+    byte b = ((type<<4)&0xf0)|(instance&0x0f);
     outputByte(b);
     output2ByteDouble(level,0.004);
     output4ByteUDouble(capacity,0.1);
