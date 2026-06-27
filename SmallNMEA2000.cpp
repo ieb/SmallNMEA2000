@@ -687,7 +687,7 @@ void EngineMonitor::sendTransmissionDynamicParamMessage(
     outputByte(engineInstance);
     outputByte(transissionGear);
     output2ByteUDouble(transmissionOilPressure,100);
-    output2ByteUDouble(transmissionOilTemperature,0.01);
+    output2ByteUDouble(transmissionOilTemperature,0.1);
     outputByte(status);
     outputByte(0x00);
     finishPacket();
