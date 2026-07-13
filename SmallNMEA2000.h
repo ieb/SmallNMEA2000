@@ -93,7 +93,7 @@ class SNMEA2000DeviceInfo {
     /**
      * @brief Construct a new Device Information object
      * 
-     * @param uniqueNumber  unique mumber 
+     * @param uniqueNumber  unique mumber, make it high to lower the priority vs commercial products for address claim.
      * @param deviceFunction http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
      * @param deviceClass http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
      * @param manufacturersCode http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
@@ -105,7 +105,7 @@ class SNMEA2000DeviceInfo {
         uint32_t uniqueNumber, 
         unsigned char deviceFunction, 
         unsigned char deviceClass,
-        uint16_t manufacturersCode = 2048, 
+        uint16_t manufacturersCode = 2046, 
         unsigned char industryGroup = 4,
         unsigned char deviceInstance = 0,
         unsigned char systemInstance = 0
